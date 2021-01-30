@@ -1,0 +1,288 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+
+#include "StreetsDatabaseAPI.h"
+#include "LatLon.h"
+#include "m1.h"
+#include "m2.h"
+#include "m2_2.h"
+#include "m3.h"
+#include "m4.h"
+#include "m3_2.h"
+#include "m4_2.h"
+#include <algorithm>
+#include <vector>
+#include <unordered_map>
+#include <cmath> 
+#include <queue> 
+#include "RTreeLatLon.h"
+#include <boost/geometry.hpp>
+#include <boost/geometry/geometries/register/point.hpp>
+#include <boost/geometry/index/rtree.hpp>
+#include "Edges.h"
+#include "IntersectionNode.h"
+#include "Graph.h"
+
+namespace bg = boost::geometry;
+namespace bgi = boost::geometry::index;
+
+//R-Trees           
+typedef std::pair<RTreeLatLon, unsigned> delivery_rtree_pair;
+bgi::rtree<delivery_rtree_pair, bgi::quadratic<16>> depotRTree;
+
+//typedef std::pair<RTreeLatLon, unsigned> pickup_rtree_pair;
+bgi::rtree<delivery_rtree_pair, bgi::quadratic<16>> pickupRTree;
+
+//typedef std::pair<RTreeLatLon, unsigned> dropoff_rtree_pair;
+bgi::rtree<delivery_rtree_pair, bgi::quadratic<16>> dropoffRTree;
+
+void load_RTrees(const std::vector<DeliveryInfo>& deliveries, 
+                                        const std::vector<unsigned>& depots) {
+    for(unsigned i = 0; i < depots.size();  i++){
+            depotRTree.insert(std::make_pair( 
+                    RTreeLatLon(getIntersectionPosition(depots[i]).lat(), 
+                    getIntersectionPosition(depots[i]).lon()), depots[i]));
+    }
+    for(unsigned i = 0; i < deliveries.size();  i++){
+            pickupRTree.insert(std::make_pair( 
+                    RTreeLatLon(getIntersectionPosition(deliveries[i].pickUp).lat(), 
+                    getIntersectionPosition(deliveries[i].pickUp).lon()), deliveries[i].pickUp));
+            dropoffRTree.insert(std::make_pair( 
+                    RTreeLatLon(getIntersectionPosition(deliveries[i].dropOff).lat(), 
+                    getIntersectionPosition(deliveries[i].dropOff).lon()), i));
+    }
+    return;
+}
+
+
+// This routine takes in a vector of N deliveries (pickUp, dropOff
+// intersection pairs), another vector of M intersections that
+// are legal start and end points for the path (depots) and a turn 
+// penalty in seconds (see m3.h for details on turn penalties). 
+//
+// The first vector 'deliveries' gives the delivery information: a set of 
+// pickUp/dropOff pairs of intersection ids which specify the 
+// deliveries to be made. A delivery can only be dropped-off after 
+// the associated item has been picked-up. 
+// 
+// The second vector 'depots' gives the intersection
+// ids of courier company depots containing trucks; you start at any
+// one of these depots and end at any one of the depots.
+//
+// This routine returns a vector of street segment ids that form a
+// path, where the first street segment id is connected to a depot
+// intersection, and the last street segment id also connects to a
+// depot intersection.  The path must traverse all the delivery
+// intersections in an order that allows all deliveries to be made --
+// i.e. a package won't be dropped off if you haven't picked it up
+// yet.
+//
+// You can assume that N is always at least one, and M is always at
+// least one (i.e. both input vectors are non-empty).
+//
+// It is legal for the same intersection to appear multiple times in
+// the pickUp or dropOff list (e.g. you might have two deliveries with
+// a pickUp intersection id of #50). The same intersection can also
+// appear as both a pickUp location and a dropOff location.
+//        
+// If you have two pickUps to make at an intersection, 
+// traversing the intersection once is sufficient
+// to pick up both packages, and similarly one traversal of an 
+// intersection is sufficient to drop off all the (already picked up) 
+// packages that need to be dropped off at that intersection.
+//
+// Depots will never appear as pickUp or dropOff locations for deliveries.
+//  
+// If no path connecting all the delivery locations
+// and a start and end depot exists, this routine must return an
+// empty (size == 0) vector.
+std::vector<unsigned> traveling_courier(const std::vector<DeliveryInfo>& deliveries, 
+                                        const std::vector<unsigned>& depots, 
+                                        const float turn_penalty){
+    std::vector<unsigned> path;
+    std::vector<unsigned> subpath;
+    
+//    load_RTrees(deliveries, depots);
+//    
+//    std::vector<delivery_rtree_pair> closest_pickup;
+//    std::vector<delivery_rtree_pair> closest_dropoff;
+//    std::vector<delivery_rtree_pair> closest;
+    
+//    bool use_pick_up = false;
+//    bool use_drop_off = false;
+//    const int num_closest = 1; 
+//    unsigned depot_index = 0; 
+    unsigned current_delivery;
+    unsigned next_delivery;
+    
+//    std::unordered_map<unsigned, unsigned> pickedUp;
+    
+//    do {
+//        pickupRTree.query(bgi::nearest(RTreeLatLon(getIntersectionPosition(
+//            depots[depot_index]).lat(), getIntersectionPosition(
+//            depots[depot_index]).lon()), num_closest), 
+//            std::back_inserter(closest));
+//        current_delivery = closest[num_closest-1].second;
+    current_delivery = deliveries[0].pickUp;
+//        pickupRTree.query(bgi::nearest(RTreeLatLon(getIntersectionPosition(
+//            depots[0]).lat(), getIntersectionPosition(
+//            depots[0]).lon()), 1), 
+//            std::back_inserter(closest));
+//        current_delivery = closest[0].second;
+//        closest.clear();
+//        subpath = find_path_between_intersections(depots[depot_index], 
+//                current_delivery, turn_penalty);
+    subpath = find_path_between_intersections(depots[0], 
+                current_delivery, turn_penalty);
+//        num_closest++;
+//        if (subpath.size() == 0 && num_closest > deliveries.size()){
+//            depot_index++;
+//            num_closest = 1;
+//        }
+//        if (subpath.size() == 0 && depot_index >= depots.size()){
+//            path.clear();
+//            return path;
+//        }
+//    } while(subpath.size() == 0);
+    
+    path.insert(path.end(), subpath.begin(), subpath.end());
+    subpath.clear();
+//    pickupRTree.remove(closest_pickup[num_closest - 2]);
+//    pickupRTree.remove(closest[0]);
+//    pickedUp.emplace(current_delivery, current_delivery);
+//    num_closest = 1;
+    for (int i = 1; i < deliveries.size(); i++){
+        next_delivery = deliveries[i].pickUp;
+        subpath = find_path_between_intersections(
+            current_delivery, next_delivery, turn_penalty);
+        path.insert(path.end(), subpath.begin(), subpath.end());
+        subpath.clear();
+        current_delivery = next_delivery;
+    }
+    
+    for (int i = 0; i < deliveries.size(); i++){
+        next_delivery = deliveries[i].dropOff;
+        subpath = find_path_between_intersections(
+            current_delivery, next_delivery, turn_penalty);
+        path.insert(path.end(), subpath.begin(), subpath.end());
+        subpath.clear();
+        current_delivery = next_delivery;
+    }
+    
+   
+//    while(!dropoffRTree.empty())
+//    {
+//        //do{
+//            
+//            dropoffRTree.query(bgi::nearest(RTreeLatLon(getIntersectionPosition(current_delivery).lat(), 
+//                    getIntersectionPosition(current_delivery).lon()), num_closest), 
+//                    std::back_inserter(closest_dropoff));
+//            if(!pickupRTree.empty()){
+//                pickupRTree.query(bgi::nearest(RTreeLatLon(getIntersectionPosition(current_delivery).lat(), 
+//                    getIntersectionPosition(current_delivery).lon()), num_closest), 
+//                    std::back_inserter(closest_pickup));
+//                
+//                double ptime = get_heuristic(current_delivery, closest_pickup[num_closest - 1].second);
+//
+//                if (pickedUp.find(deliveries[closest_dropoff[num_closest - 1].second].pickUp) == pickedUp.end()){
+//                    next_delivery = closest_pickup[num_closest - 1].second;
+//                    use_pick_up=true;
+//                    use_drop_off=false;
+//                }
+//                else{
+//                    double dtime = get_heuristic(current_delivery, deliveries[closest_dropoff[num_closest - 1].second].dropOff);
+//                    if(ptime < dtime){
+//                        next_delivery = closest_pickup[num_closest - 1].second;
+//                        use_pick_up=true;
+//                        use_drop_off=false;
+//                    }
+//                    else{
+//                        next_delivery = deliveries[closest_dropoff[num_closest - 1].second].dropOff;
+//                        use_pick_up=false;
+//                        use_drop_off=true;
+//                    }
+//                }
+//            }
+//            else{
+//                next_delivery = deliveries[closest_dropoff[num_closest - 1].second].dropOff;
+//                use_pick_up=false;
+//                use_drop_off=true;
+//            }
+//              
+//            
+//            subpath = find_path_between_intersections( current_delivery,next_delivery, turn_penalty);
+
+//            num_closest++;
+//            if (subpath.size() == 0 && num_closest > deliveries.size()){
+//                path.clear();
+//                return path;
+//            }
+
+//            closest_pickup.clear();
+//
+//            closest_dropoff.clear();
+     
+        //} while(subpath.size()==0);
+        
+//        if(use_pick_up){
+//            pickupRTree.remove(closest_pickup[num_closest - 2]);
+//            pickedUp.emplace(current_delivery, current_delivery);
+//        }
+//        else{
+//            dropoffRTree.remove(closest_dropoff[num_closest - 2]);
+//        }
+//        
+//        current_delivery=next_delivery;
+//        path.insert(path.end(), subpath.begin(), subpath.end());
+//        subpath.clear();
+//        closest_pickup.clear(); 
+//        closest_dropoff.clear(); 
+//        closest.clear();
+//    }
+//    
+//    //num_closest = 1;
+//    subpath.clear();
+//    closest.clear();
+//    //For last depot
+//     
+//    //do {
+////        depotRTree.query(bgi::nearest(RTreeLatLon(getIntersectionPosition(
+////            current_delivery).lat(), getIntersectionPosition(
+////            current_delivery).lon()), num_closest), 
+////            std::back_inserter(closest));
+//        depotRTree.query(bgi::nearest(RTreeLatLon(getIntersectionPosition(
+//            current_delivery).lat(), getIntersectionPosition(
+//            current_delivery).lon()), 1), 
+//            std::back_inserter(closest));
+//        //next_delivery = closest[num_closest-1].second;
+//        next_delivery = closest[0].second;
+//        subpath = find_path_between_intersections(current_delivery, 
+//                next_delivery, turn_penalty);
+////        num_closest++;
+////        if (subpath.size() == 0 && num_closest > depots.size()){
+////            path.clear();
+////            return path;
+////        }
+//        subpath.clear();
+//        closest.clear();
+//    //} while(subpath.size() == 0);
+//    
+//    path.insert(path.end(), subpath.begin(), subpath.end());
+//    
+//    depotRTree.clear();
+//    dropoffRTree.clear();
+//    pickupRTree.clear();
+    
+    
+    next_delivery = depots[0];
+    subpath = find_path_between_intersections(
+        current_delivery, next_delivery, turn_penalty);
+    path.insert(path.end(), subpath.begin(), subpath.end());
+    subpath.clear();
+  
+    return path;
+}

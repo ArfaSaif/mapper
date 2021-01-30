@@ -1,0 +1,13 @@
+K 8
+svn:date
+V 27
+2018-01-12T20:12:08.497000Z
+K 7
+svn:log
+V 59
+Fixed memory leak on lline 31 of main, deleted the object g
+K 10
+svn:author
+V 8
+saifarfa
+END

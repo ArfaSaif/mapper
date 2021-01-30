@@ -1,0 +1,13 @@
+K 8
+svn:date
+V 27
+2018-01-12T19:57:33.189000Z
+K 7
+svn:log
+V 68
+Fixed an invalid read of an array in the file math_utils.cpp line 58
+K 10
+svn:author
+V 8
+saifarfa
+END

@@ -1,0 +1,286 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+
+#include "StreetsDatabaseAPI.h"
+#include "LatLon.h"
+#include "m1.h"
+#include "m2.h"
+#include "m2_2.h"
+#include "m3.h"
+#include "m4.h"
+#include "m3_2.h"
+#include "m4_2.h"
+#include <algorithm>
+#include <vector>
+#include <unordered_map>
+#include <cmath> 
+#include <queue> 
+#include "RTreeLatLon.h"
+#include <boost/geometry.hpp>
+#include <boost/geometry/geometries/register/point.hpp>
+#include <boost/geometry/index/rtree.hpp>
+#include "Edges.h"
+#include "IntersectionNode.h"
+#include "Graph.h"
+
+//namespace bg = boost::geometry;
+//namespace bgi = boost::geometry::index;
+//
+////R-Trees           
+//typedef std::pair<RTreeLatLon, unsigned> delivery_rtree_pair;
+//bgi::rtree<delivery_rtree_pair, bgi::quadratic<16>> depotRTree;
+//
+////typedef std::pair<RTreeLatLon, unsigned> pickup_rtree_pair;
+//bgi::rtree<delivery_rtree_pair, bgi::quadratic<16>> pickupRTree;
+//
+////typedef std::pair<RTreeLatLon, unsigned> dropoff_rtree_pair;
+//bgi::rtree<delivery_rtree_pair, bgi::quadratic<16>> dropoffRTree;
+//
+//void load_RTrees(const std::vector<DeliveryInfo>& deliveries, 
+//                                        const std::vector<unsigned>& depots) {
+//    for(unsigned i = 0; i < depots.size();  i++){
+//            depotRTree.insert(std::make_pair( 
+//                    RTreeLatLon(getIntersectionPosition(depots[i]).lat(), 
+//                    getIntersectionPosition(depots[i]).lon()), depots[i]));
+//    }
+//    for(unsigned i = 0; i < deliveries.size();  i++){
+//            pickupRTree.insert(std::make_pair( 
+//                    RTreeLatLon(getIntersectionPosition(deliveries[i].pickUp).lat(), 
+//                    getIntersectionPosition(deliveries[i].pickUp).lon()), deliveries[i].pickUp));
+//            dropoffRTree.insert(std::make_pair( 
+//                    RTreeLatLon(getIntersectionPosition(deliveries[i].dropOff).lat(), 
+//                    getIntersectionPosition(deliveries[i].dropOff).lon()), i));
+//    }
+//    return;
+//}
+
+
+// This routine takes in a vector of N deliveries (pickUp, dropOff
+// intersection pairs), another vector of M intersections that
+// are legal start and end points for the path (depots) and a turn 
+// penalty in seconds (see m3.h for details on turn penalties). 
+//
+// The first vector 'deliveries' gives the delivery information: a set of 
+// pickUp/dropOff pairs of intersection ids which specify the 
+// deliveries to be made. A delivery can only be dropped-off after 
+// the associated item has been picked-up. 
+// 
+// The second vector 'depots' gives the intersection
+// ids of courier company depots containing trucks; you start at any
+// one of these depots and end at any one of the depots.
+//
+// This routine returns a vector of street segment ids that form a
+// path, where the first street segment id is connected to a depot
+// intersection, and the last street segment id also connects to a
+// depot intersection.  The path must traverse all the delivery
+// intersections in an order that allows all deliveries to be made --
+// i.e. a package won't be dropped off if you haven't picked it up
+// yet.
+//
+// You can assume that N is always at least one, and M is always at
+// least one (i.e. both input vectors are non-empty).
+//
+// It is legal for the same intersection to appear multiple times in
+// the pickUp or dropOff list (e.g. you might have two deliveries with
+// a pickUp intersection id of #50). The same intersection can also
+// appear as both a pickUp location and a dropOff location.
+//        
+// If you have two pickUps to make at an intersection, 
+// traversing the intersection once is sufficient
+// to pick up both packages, and similarly one traversal of an 
+// intersection is sufficient to drop off all the (already picked up) 
+// packages that need to be dropped off at that intersection.
+//
+// Depots will never appear as pickUp or dropOff locations for deliveries.
+//  
+// If no path connecting all the delivery locations
+// and a start and end depot exists, this routine must return an
+// empty (size == 0) vector.
+std::vector<unsigned> traveling_courier(const std::vector<DeliveryInfo>& deliveries, 
+                                        const std::vector<unsigned>& depots, 
+                                        const float turn_penalty){
+    std::vector<unsigned> path;
+    std::vector<unsigned> subpath;
+    std::vector<unsigned> pick_up;
+    std::vector<unsigned> drop_off;
+    std::vector<unsigned> pick_ups;
+    std::vector<unsigned> drop_offs;
+    
+
+    unsigned current_delivery;
+    unsigned next_delivery;
+    
+    pick_up.resize(deliveries.size());
+    drop_off.resize(deliveries.size());
+    for (unsigned m = 0; m < deliveries.size(); m++){
+
+        pick_up[m]=deliveries[m].pickUp;
+        drop_off[m]=deliveries[m].dropOff;
+    }
+    
+    delete_duplicates(pick_up);
+    delete_duplicates(drop_off);
+    pick_ups =two_opt_algorithm(pick_up);
+    drop_offs=two_opt_algorithm(drop_off);
+    
+    unsigned chosen_depot=0;
+    double min_time=0.0;
+    unsigned second_depot=0;
+    double min_second_time=0.0;
+    for(unsigned n=0; n<depots.size(); n++)
+    {
+       double new_time=get_heuristic(depots[n], pick_ups[0]);
+       if(n==0 || new_time<min_time ){
+           min_time=new_time;
+           chosen_depot=depots[n];
+       }
+       else if(n==1|| new_time<min_second_time)
+       {
+           second_depot=depots[n];
+           min_second_time=new_time;
+       }
+    }
+   
+    
+    subpath = find_path_between_intersections(chosen_depot, 
+                pick_ups[0], turn_penalty);
+    
+    if(subpath.size()==0 && depots.size() > 1){
+       subpath = find_path_between_intersections(second_depot, 
+                pick_ups[0], turn_penalty);
+    }
+    
+    path.insert(path.end(), subpath.begin(), subpath.end());
+    subpath.clear();
+    
+    unsigned i=0;
+    for(i=0; i<pick_ups.size()-1;i++){
+         subpath = find_path_between_intersections(
+           pick_ups[i],pick_ups[i+1], turn_penalty);
+            path.insert(path.end(), subpath.begin(), subpath.end());
+            subpath.clear();
+    }
+    
+    subpath = find_path_between_intersections(
+           pick_ups[pick_ups.size()-1],drop_offs[0], turn_penalty);
+            path.insert(path.end(), subpath.begin(), subpath.end());
+            subpath.clear();
+    
+    for(unsigned j=0; j<drop_offs.size()-1;j++){
+         subpath = find_path_between_intersections(
+           drop_offs[j],drop_offs[j+1], turn_penalty);
+            path.insert(path.end(), subpath.begin(), subpath.end());
+            subpath.clear();
+    }
+    
+            
+   
+    for(unsigned n=0; n<depots.size(); n++)
+    {
+       double new_time=get_heuristic(drop_offs[drop_offs.size()-1],depots[n]) ;
+       if(n==0 || new_time<min_time ){
+           min_time=new_time;
+           chosen_depot=depots[n];
+       }
+       else if(n==1|| new_time<min_second_time)
+       {
+           second_depot=depots[n];
+           min_second_time=new_time;
+       }
+    }        
+
+    
+    current_delivery=drop_offs[drop_offs.size()-1];
+    next_delivery = chosen_depot;
+    subpath = find_path_between_intersections(
+        current_delivery, next_delivery, turn_penalty);
+    if(subpath.size()==0){
+        subpath.clear();
+        next_delivery = second_depot;
+        subpath = find_path_between_intersections(
+        current_delivery, next_delivery, turn_penalty);
+    }
+    path.insert(path.end(), subpath.begin(), subpath.end());
+   
+    
+  
+    return path;
+}
+
+std::vector<unsigned> two_opt_algorithm(const std::vector<unsigned>& paths){
+    
+    int improve=0;
+    bool start=true;
+    
+    std::vector<unsigned> latest_path;
+    std::vector<unsigned> new_path;
+    latest_path=paths;
+     double new_time=0.0;
+     double best_time=0.0;
+    while(improve<5)
+    {
+        
+        if(start){
+            best_time= estimate_total_time(latest_path);
+            start=false;
+        }
+        
+        for(unsigned i=1;i<latest_path.size()-1;i++)
+        {
+            for(unsigned k=i+1;k<latest_path.size();k++)
+            {
+               new_path=two_opt_swap(latest_path,i,k);
+               new_time=estimate_total_time(new_path);
+                
+                if(new_time<best_time)
+                {
+                    improve=0;
+                    latest_path=new_path;
+                    best_time=new_time;
+                    start=true;
+                }
+            }
+        }
+        improve++;        
+    }
+    
+    return latest_path;
+}
+
+std::vector<unsigned> two_opt_swap(const std::vector<unsigned>& paths, 
+        unsigned i, unsigned k){
+    std::vector<unsigned> new_path;
+    
+    for(unsigned l=0;l<=i-1;l++)
+    {
+        new_path.push_back(paths[l]);
+    }
+    
+    for(unsigned l=k;l>=i;l--)
+    {
+        new_path.push_back(paths[l]);
+    }
+    
+    for(unsigned l=k+1;l<paths.size();l++)
+    {
+        new_path.push_back(paths[l]);
+    }
+    
+    return new_path;
+    
+}
+
+double estimate_total_time(const std::vector<unsigned>&paths){
+    
+    double time=0.0;
+    for(unsigned i=0;i<paths.size()-1;i++){
+        time+=get_heuristic(paths[i],paths[i+1]);
+    }
+    
+    return time;
+    
+}

@@ -1,0 +1,43 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+/* 
+ * File:   m4_2.h
+ * Author: achary39
+ *
+ * Created on March 29, 2018, 12:17 PM
+ */
+
+#ifndef M4_2_H
+#define M4_2_H
+
+#include "StreetsDatabaseAPI.h"
+#include "LatLon.h"
+#include "graphics.h"
+#include "m1.h"
+#include "m2.h"
+#include "m2_2.h"
+#include "m3.h"
+#include "m3_2.h"
+#include "m4.h"
+#include <algorithm>
+#include <vector>
+#include <unordered_map>
+#include <cmath> 
+#include <queue> 
+
+
+#include "Edges.h"
+#include "IntersectionNode.h"
+#include "Graph.h"
+
+
+void load_RTrees(const std::vector<DeliveryInfo>& deliveries, 
+                                        const std::vector<unsigned>& depots);
+
+
+#endif /* M4_2_H */
+

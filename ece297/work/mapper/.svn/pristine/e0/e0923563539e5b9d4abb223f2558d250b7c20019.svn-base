@@ -1,0 +1,448 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+#include "StreetsDatabaseAPI.h"
+#include "LatLon.h"
+#include "graphics.h"
+#include "m1.h"
+#include "m2.h"
+#include "m2_2.h"
+#include "m3.h"
+#include "m3_2.h"
+#include <algorithm>
+#include <vector>
+#include <unordered_map>
+#include <cmath> 
+
+
+#include "Edges.h"
+#include "IntersectionNode.h"
+#include "Graph.h"
+
+
+//int num_intersections = getNumberOfIntersections();
+//int num_poi =  getNumberOfPointsOfInterest();
+
+
+
+//struct Graph* intersection_graph = create_graph(num_intersections);
+//struct Graph* poi_graph = create_graph(num_poi);
+
+//double maximum_speed;
+
+//void load_poi_graph(){
+
+//}
+
+std::vector<unsigned> reconstruct_path( std::vector<unsigned> &came_from){
+//    std::vector<IntersectionNode> total_path;
+//    total_path.push_back(current_node);
+//    std::unordered_map<double, IntersectionNode>::const_iterator found;
+//    found = came_from.find(f);
+//    while (found != came_from.end()){
+//        current_node;
+//    }
+    unsigned node_id1;
+     unsigned node_id2;
+    std::vector<unsigned> total_path;
+    for (unsigned i = 0; i < came_from.size() - 1; i++){
+               node_id1 = came_from[i];
+        node_id2 = came_from[i+1];
+        auto adjacent = map_graph.all_intersections[node_id1].adjacent_intersection_ids;
+        
+        for(unsigned k=0; k < adjacent.size(); k++){
+            if(adjacent[k].get_to() == node_id2){
+                total_path.push_back(adjacent[k].street_ss_id);
+                break;
+                
+            }
+        }
+       // double path_street_id = map_graph.all_intersections[node_id1].adjacent_intersection_ids;
+        
+        
+    }
+    
+    return total_path;
+}
+
+double get_heuristic(unsigned successor_id, unsigned end_id){
+    LatLon point1 = getIntersectionPosition(successor_id);
+    LatLon point2 = getIntersectionPosition(end_id);
+    double distance = find_distance_between_two_points(point1, point2);
+    double speed = map_graph.max_speed;
+    double time = distance / speed;
+    
+    return time;
+}
+
+std::vector<unsigned> construct_path(std::unordered_map<unsigned,unsigned> &camefrom,unsigned current){
+   // std::vector<unsigned>path;
+    //path.push_back(current);
+    
+    if(camefrom.find(current) == camefrom.end()){
+        std::vector<unsigned > path2;
+        path2.push_back(current);
+        return path2;
+    }
+   auto path=construct_path(camefrom, camefrom[current]);
+    path.push_back(current);
+    
+    return path;
+}
+
+//bool compare(std::pair<unsigned,double>first,)
+
+///////////////// A* Algorithm ///////////////////////////////////////////////////
+std::vector<unsigned> a_star(unsigned start_id, unsigned end_id){
+//    std::vector<IntersectionNode> closed_set;
+//    std::vector<IntersectionNode> open_set;
+//    Initialize closed set
+//    The set of nodes already evaluated 
+    unsigned num_intersections = getNumberOfIntersections();
+    std::unordered_map<unsigned, IntersectionNode> closed_set;
+    //closed_set.reserve(num_intersections);
+    //Initialize f list
+    std::vector<double> f_list;
+    f_list.resize(num_intersections);
+    std::vector<unsigned> path5;
+    //unsigned num_ss = getNumberOfStreetSegments();
+    //path5.resize(num_ss);
+    //Initialize open set
+    //The set of currently discovered nodes that are not evaluated
+    //yet.
+    std::unordered_map<unsigned, IntersectionNode> open_set;
+    open_set.rehash(num_intersections);
+    //std::vector<unsigned> open_inter;
+    //std::vector<unsigned> closed_inter;
+    
+    IntersectionNode start = map_graph.all_intersections[start_id];
+    IntersectionNode end = map_graph.all_intersections[end_id];
+    
+    std::unordered_map<unsigned, unsigned>came_from; 
+    //std::vector<IntersectionNode> came_from;
+    std::unordered_map<unsigned, double>gScore;
+    gScore.rehash(num_intersections);
+    std::unordered_map<double, unsigned>fScore;
+    fScore.rehash(num_intersections);
+    
+    gScore.emplace(start_id, 0.0);
+    double score = get_heuristic(start_id, end_id);
+    fScore.emplace(score, start_id);
+    //Put starting intersection/node in open set with f set to 0
+    // for the first node, value is completely heuristic 
+    // f = heuristic_cost_estimate(start, end)
+    //double const f_start = 0;
+    f_list.push_back(score);
+    open_set.emplace(start_id, start);
+    //open_inter.push_back(start_id);
+    
+    //Intersection nodes for current and successor nodes 
+    IntersectionNode node_successor;
+    IntersectionNode node_current;
+    
+    unsigned node_current_id = start_id;
+    //unsigned end_id = end_id;
+    //while the open set is not empty 
+    while(open_set.size() != 0){
+        
+        
+        //find minimum f in open_set 
+        //double f_min = *(std::min_element(f_list.begin(), f_list.end()));
+        auto f_min = *std::min_element(f_list.begin(), f_list.end());
+        //double f_min = *f_min_pointer;
+        //double f_min = 0; 
+        //find the node with the minimum f 
+        //this is the current node
+//        if(node_current.intersection_id==end.intersection_id){
+//            return reconstruct_path(came_from);
+//        }
+       // node_current = map_graph.all_intersections[fScore[f_min];
+        node_current_id = fScore[f_min];
+        node_current = map_graph.all_intersections[node_current_id];
+        
+       // std::cout<<node_current_id<<std::endl;
+        
+        //if current node is the destination then exit loop
+            if (node_current_id == end_id){
+                //came_from.push_back(end_id);
+                //came_from.emplace(end_id, node_current_id);
+                std::vector<unsigned> way = construct_path(came_from, node_current_id);
+                path5 = reconstruct_path(way);
+                return path5;
+                //break;
+            } 
+        
+         //remove current node from open list 
+        f_list.erase(std::find(f_list.begin(),f_list.end(),f_min));
+        // fScore.erase(f_min);
+        open_set.erase(node_current_id);
+        closed_set.emplace(node_current_id, node_current);
+        //open_inter.erase(std::find(open_inter.begin(),open_inter.end(),node_current_id));
+        
+       
+        //add to closed set
+        //closed_set.emplace(f_min, node_current);
+        //get vector with intersection ids of current node's adjacent nodes
+        //these are the current node's successors 
+        std::vector<Edges> adj = node_current.adjacent_intersection_ids;
+        // for each successor 
+        for (unsigned i = 0; i < adj.size(); i++) {
+            //node_successor = map_graph.all_intersections[adj[i]];
+            //unsigned node_successor_id = node_successor.intersection_id;
+            //Get the succesors using the graph
+            unsigned node_successor_id = adj[i].get_to();
+            node_successor = map_graph.all_intersections[node_successor_id];
+            
+//            if current node is the destination then exit loop
+//            if (node_successor_id == end_id){
+//                came_from.push_back(end_id);
+//                reconstruct_path(came_from);
+//                return path;
+//                //break;
+//            } 
+            
+            //if(adj[i])
+            //f = g + h
+            // g is cost and h is heuristic 
+            // get g (current and successor)
+            //double g = map_graph.all_streets[node_current_id][adj[i]].travel_time;
+            double g = adj[i].travel_time;
+//            double g_successor = 0;
+            double h_successor = get_heuristic(node_successor_id, end_id);
+            double f_successor = g + h_successor;
+            
+            double successor_current_cost = gScore[node_current.intersection_id] + g;
+            // find nodes in sets 
+//            std::unordered_map<double, IntersectionNode>::const_iterator found_os;
+//            found_os = open_set.find(f_successor);
+//            std::unordered_map<double, IntersectionNode>::const_iterator found_cs;
+//            found_cs = closed_set.find(f_successor);
+            
+            std::unordered_map<unsigned, IntersectionNode>::const_iterator found_os = open_set.find(node_successor_id);
+            std::unordered_map<unsigned, IntersectionNode>::const_iterator found_cs = closed_set.find(node_successor_id);
+            //came_from.push_back(node_current);
+            //path = reconstruct_path(came_from);
+                    //continue;
+            // }
+            //open_set.emplace(f_successor, node_successor);
+            if (found_cs != closed_set.end() && 
+                    successor_current_cost >= gScore[node_successor_id])
+                continue;
+            
+            if(found_cs == closed_set.end() || 
+                    successor_current_cost < gScore[node_successor_id])
+            {
+                if(came_from.find(node_successor_id) != came_from.end()){
+                    came_from[node_successor_id]=node_current_id;
+                }
+                else{
+                    came_from.emplace(node_successor_id,node_current_id);
+                }
+            }
+//            if (found_os == open_set.end()){
+//                 f_list.push_back(f_successor);
+//                open_set.emplace(f_successor, node_successor);
+//               
+//            }
+//            else if (found_cs != closed_set.end()){
+//                if (gScore[node_successor.intersection_id] <= successor_current_cost)
+//                    continue;
+//                
+//                f_list.push_back(f_successor);
+//                open_set.emplace(f_successor, node_successor);
+//                //open_inter(node_successor_id);
+//                closed_set.erase(f_successor);
+//                //closed_inter.erase(std::find(closed_inter.start(),closed_inter.end(),node_current_id);
+//                //set h(node_successor) to be the heuristic distance to end
+//                //open_set.emplace(f_successor, node_successor);
+//            }
+//            else{
+//                f_list.push_back(f_successor);
+//                open_set.emplace(f_successor, node_successor);
+//                //open_inter(node_successor_id);
+//                //f_list.push_back(f_successor);
+//            }
+//            if(gScore[node_successor.intersection_id] <= successor_current_cost)
+//                continue;
+            
+            gScore[node_successor_id] = successor_current_cost;
+            
+             if(fScore.find(f_successor) != fScore.end()){
+                 fScore[f_successor] = node_successor_id;
+             }
+             else
+                fScore.emplace(f_successor, node_successor_id);
+            
+            //fScore[node_successer_id]=f_successor;
+            //fScore[]
+            
+            if (found_os == open_set.end()){
+                 //f_list.push_back(f_successor);
+                f_list.push_back(f_successor);
+                open_set.emplace(node_successor_id, node_successor);
+               
+                
+            }
+//                 f_list.push_back(f_successor);
+//                open_set.emplace(f_successor, node_successor);
+//               
+//            }
+            //came_from.emplace(node_successor_id,node_current_id);
+            //came_from.push_back(node_current);
+            //
+            //came_from.push_back(node_current);
+            //set g(node_successor) = f; 
+//            IntersectionNode temp = node_successor;
+//            node_successor = node_current->next;
+            //node_current = parent of successor
+        }
+        //closed_set.emplace(f_min, node_current);
+        //closed_inter.push_back(node_current_id);
+        //f_list.erase(std::find(f_list.begin(),f_list.end(),f_min));
+        //open_set.erase(f_min);
+        //came_from.push_back(node_current);
+    }
+//   if(node_current_id != end_id) {
+       path5.clear();
+//        return path;
+//    }
+       open_set.clear();
+       closed_set.clear();
+       f_list.clear();
+       fScore.clear();
+       gScore.clear();
+       came_from.clear();
+        //came_from.push_back(node_current);
+    //reconstruct_path(came_from);
+ return path5;
+}
+
+// Returns the time required to travel along the path specified, in seconds. 
+// The path is given as a vector of street segment ids, and this function 
+// can assume the vector either forms a legal path or has size == 0.
+// The travel time is the sum of the length/speed-limit of each street 
+// segment, plus the given turn_penalty (in seconds) per turn implied by the path. 
+// A turn occurs when two consecutive street segments have different street IDs.
+double compute_path_travel_time(const std::vector<unsigned>& path, 
+                                const double turn_penalty){
+    double travel_time = 0;
+    int num_turns = 0;
+    double street_segment_travel_time = 0;
+    
+    if (path.size() == 0){
+        return travel_time;
+    }
+    
+    for (unsigned i = 0; i < path.size(); i++){
+        street_segment_travel_time = find_street_segment_travel_time(path[i]);
+        
+        if (i != path.size() - 1){
+            
+            auto street_segment_info = getStreetSegmentInfo(path[i]);
+            auto street_segment_ID = street_segment_info.streetID;
+            std::string street_segment_name = getStreetName(street_segment_ID);
+            
+            auto street_segment_info1 = getStreetSegmentInfo(path[i + 1]);
+            auto street_segment_ID1 = street_segment_info1.streetID;
+            std::string street_segment_name1 = getStreetName(street_segment_ID1);
+            
+            if (street_segment_name != street_segment_name1){
+                num_turns++;
+            }
+            
+        }
+       
+        travel_time = travel_time + street_segment_travel_time;
+        
+    }
+    
+    travel_time += num_turns * turn_penalty;
+    
+    return travel_time;
+}
+
+
+// Returns a path (route) between the start intersection and the end 
+// intersection, if one exists. This routine should return the shortest path
+// between the given intersections when the time penalty to turn (change
+// street IDs) is given by turn_penalty (in seconds).
+// If no path exists, this routine returns an empty (size == 0) vector. 
+// If more than one path exists, the path with the shortest travel time is 
+// returned. The path is returned as a vector of street segment ids; traversing 
+// these street segments, in the returned order, would take one from the start 
+// to the end intersection.
+std::vector<unsigned> find_path_between_intersections(const unsigned intersect_id_start, 
+                                                      const unsigned intersect_id_end,
+                                                      const double turn_penalty){
+    
+    
+    
+    //If the intersections are connected directly then return one segment
+    std::vector<unsigned> path_between_intersections;
+    
+    //Check that the intersect ids are within range of available intersections
+    if(intersect_id_start>(getNumberOfIntersections()-1)||intersect_id_end>(getNumberOfIntersections()-1))
+        return path_between_intersections;
+        
+    
+   //If the intersections are connected directly then return one segment
+    if(are_directly_connected(intersect_id_start,intersect_id_end)){
+        std::vector<unsigned> path;
+        path.resize(2);
+        path[0]=intersect_id_start;
+        path[1]=intersect_id_end;
+        path_between_intersections=reconstruct_path(path);
+        return path_between_intersections;
+    }
+     unsigned start=intersect_id_start;
+     unsigned end=intersect_id_end;
+    path_between_intersections =  a_star(start,end);
+    
+    return path_between_intersections;
+    
+}
+
+
+// Returns the shortest travel time path (vector of street segments) from 
+// the start intersection to a point of interest with the specified name.
+// The path will begin at the specified intersection, and end on the 
+// intersection that is closest (in Euclidean distance) to the point of 
+// interest.
+// If no such path exists, returns an empty (size == 0) vector.
+std::vector<unsigned> find_path_to_point_of_interest(const unsigned intersect_id_start, 
+                                               const std::string point_of_interest_name,
+                                               const double turn_penalty){
+    std::vector<unsigned> path_to_point_of_interest;//Store the fastest path
+    
+    //Get poi_ids from the name
+    auto poi_ids=find_poi_from_name(point_of_interest_name);
+    std::vector<unsigned>intersection_closest;
+    double travel_time;
+    double minimum_travel_time;
+    //Find the closest intersection for all the poi
+    for(unsigned i=0;i<poi_ids.size();++i){
+        auto position= get_poi_data(poi_ids[i]).position2;
+        intersection_closest.push_back(find_closest_intersection(position));
+    }
+    //Find paths for each intersections
+    for(unsigned j=0;j<intersection_closest.size();++j){
+         auto paths=find_path_between_intersections(intersect_id_start, intersection_closest[j],turn_penalty);
+         travel_time=compute_path_travel_time(paths,turn_penalty);
+         
+         if(travel_time<minimum_travel_time||j==0){
+             minimum_travel_time=travel_time;
+             path_to_point_of_interest=paths;
+         }
+    }
+   
+    //
+    
+    
+    
+    
+    return path_to_point_of_interest;
+    
+}

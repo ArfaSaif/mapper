@@ -1,0 +1,48 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+/* 
+ * File:   m3_2.h
+ * Author: tupilisa
+ *
+ * Created on March 10, 2018, 1:27 PM
+ */
+
+#ifndef M3_2_H
+#define M3_2_H
+
+#include "StreetsDatabaseAPI.h"
+#include "LatLon.h"
+#include "graphics.h"
+#include "m1.h"
+#include "m2.h"
+#include "m2_2.h"
+#include "m3.h"
+#include "m3_2.h"
+#include <algorithm>
+#include <vector>
+#include <unordered_map>
+#include <cmath> 
+
+#include "IntersectionNode.h"
+#include "Edges.h"
+#include "Graph.h"
+
+//Makes graph of intersection and street segments
+void load_intersection_graph();
+std::vector<unsigned> a_star(unsigned start_id, unsigned end_id, const double turn_penalty);
+std::vector<unsigned> reconstruct_path( std::vector<unsigned> &came_from);
+double get_heuristic(unsigned successor_id, unsigned end_id);
+std::vector<unsigned> reconstruct_path(unsigned start,std::vector<IntersectionNode> came_from);
+unsigned find_inter(std::unordered_map<unsigned,double> &f_Score, double f_min);
+
+std::vector<unsigned> construct_path(std::unordered_map<unsigned,unsigned> &camefrom,unsigned current);
+
+
+
+
+#endif /* M3_2_H */
+

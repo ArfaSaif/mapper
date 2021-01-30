@@ -1,0 +1,13 @@
+K 8
+svn:date
+V 27
+2018-01-12T20:11:34.211000Z
+K 7
+svn:log
+V 73
+Fixed memory leak on lline 30 of main, deleted my_density_function object
+K 10
+svn:author
+V 8
+saifarfa
+END
